@@ -53,8 +53,6 @@ bot.command('help', (ctx) => {
 
 async function resolvePendingExports() {
   try {
-    logger.silly('Resolving...');
-
     const tasksCollection = db.collection('tasks');
 
     const tasks: Task[] = await tasksCollection
@@ -67,7 +65,7 @@ async function resolvePendingExports() {
       const { data } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}`);
 
       if (data.status === 'Success') {
-        const { data: resultData } = await api.get(`/download/e/${task.exportId}`, { responseType: 'arraybuffer' });
+        const { data: resultData } = await api.get(`/download/e/${task.exportId}`, { responseType: 'stream' });
 
         await bot.telegram.sendDocument(task.chatId, {
           source: resultData,
