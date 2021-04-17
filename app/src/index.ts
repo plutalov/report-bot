@@ -1,19 +1,12 @@
-import { Telegraf } from 'telegraf';
-import { Db } from 'mongodb';
-import { api, axios } from './services/axios';
+import { api } from './services/axios';
 import { logger } from './services/logger';
-import { connectToMongoDB } from './services/mongo';
+import { connectToMongoDB, db } from './services/mongo';
 import Bluebird from 'bluebird';
 import { Task, TaskState } from './models/task';
-
-if (process.env.BOT_TOKEN == null) throw new Error(`BOT_TOKEN environment variable must be set`);
-
-let templateRootFolder: string;
-let reportRootFolder: string;
-let exportRootFolder: string;
-let db: Db;
-
-const bot = new Telegraf(process.env.BOT_TOKEN);
+import { bot } from './services/bot';
+import { handleTaskSuccess } from './services/export-task/handle-task-success';
+import { startTask } from './services/export-task/start-task';
+import { initRootFolders } from './services/init-root-folders';
 
 interface IData {
   reportInfo: {
@@ -64,33 +57,15 @@ interface IExportData {
 }
 
 async function init() {
-  db = await connectToMongoDB();
+  await connectToMongoDB();
 
-  const [
-    {
-      data: { id: templateFolderId },
-    },
-    {
-      data: { id: reportFolderId },
-    },
-    {
-      data: { id: exportFolderId },
-    },
-  ] = await Promise.all([
-    api.get('/api/rp/v1/Templates/Root'),
-    api.get('/api/rp/v1/Reports/Root'),
-    api.get('/api/rp/v1/Exports/Root'),
-  ]);
-
-  templateRootFolder = templateFolderId;
-  reportRootFolder = reportFolderId;
-  exportRootFolder = exportFolderId;
+  await initRootFolders();
 
   await bot.launch();
 
   logger.info('The bot has been launched!');
 
-  setTimeout(resolvePendingExports, 5000);
+  setTimeout(resolvePendingExports, 2500);
 }
 
 bot.command('help', (ctx) => {
@@ -105,7 +80,7 @@ async function resolvePendingExports() {
 
     const tasks: Task[] = await tasksCollection
       .find({
-        state: TaskState.pending,
+        state: TaskState.pendingExport,
       })
       .toArray();
 
@@ -113,20 +88,11 @@ async function resolvePendingExports() {
       const { data } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}`);
 
       if (data.status === 'Success') {
-        const { data: resultData } = await api.get(`/download/e/${task.exportId}`, { responseType: 'stream' });
-
-        await bot.telegram.sendDocument(task.chatId, {
-          source: resultData,
-          filename: data.name,
-        });
-
-        await tasksCollection.updateOne({ _id: task._id }, { $set: { state: TaskState.resolved } });
-
-        logger.info(`The task ${task._id} has been resolved`);
+        await handleTaskSuccess(task, data);
       }
     });
   } finally {
-    setTimeout(resolvePendingExports, 5000);
+    setTimeout(resolvePendingExports, 2500);
   }
 }
 
@@ -151,54 +117,16 @@ bot.on('document', async (ctx) => {
 
   const fileUrl = await ctx.telegram.getFileLink(fileId);
 
-  const response = await axios.get<Buffer>(fileUrl.toString(), {
-    responseType: 'arraybuffer',
-  });
-
-  const { data } = await api.post(
-    `/api/rp/v1/Templates/Folder/${templateRootFolder}/File`,
-    {
-      name: fileName,
-      content: response.data.toString('base64'),
-    },
-    {
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json-patch+json',
-      },
-    },
-  );
-
-  logger.info(data, { action: 'upload file' });
-
-  const { data: exportData } = await api.post(
-    `/api/rp/v1/Templates/File/${data.id}/Export`,
-    {
-      fileName,
-      folderId: exportRootFolder,
-      format: 'Pdf',
-    },
-    {
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json-patch+json',
-      },
-    },
-  );
-
-  logger.info(exportData, { action: 'export' });
-
   const tasksCollection = db.collection('tasks');
 
-  await tasksCollection.insertOne({
+  const task = await tasksCollection.insertOne({
     chatId: ctx.chat.id,
-    exportId: exportData.id,
-    state: TaskState.pending,
+    state: TaskState.queued,
+    fileUrl: fileUrl.toString(),
+    fileName,
   });
 
-  ctx.reply(
-    `Файл ${fileName} был добавлен в очередь для генерации отчета.\nИспользуйте команду /status ${exportData.id} для проверки статуса.`,
-  );
+  await startTask(task.ops[0]);
 });
 
 bot.command('status', async (ctx) => {
