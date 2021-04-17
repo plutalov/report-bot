@@ -10,5 +10,6 @@ export interface Task {
   fileUrl: string;
   fileName: string;
   exportId: number | null;
+  statusMessageId: number | null;
   state: TaskState;
 }

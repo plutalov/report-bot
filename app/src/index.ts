@@ -7,6 +7,8 @@ import { bot } from './services/bot';
 import { handleTaskSuccess } from './services/export-task/handle-task-success';
 import { startTask } from './services/export-task/start-task';
 import { initRootFolders } from './services/init-root-folders';
+import { hasBeenSentTemplate } from './services/text/has-been-sent-template';
+import mongo from 'mongodb';
 
 interface IData {
   reportInfo: {
@@ -169,8 +171,29 @@ bot.on('text', (ctx) => {
   ctx.telegram.sendMessage(ctx.message.chat.id, `Hello ${ctx.state.role} (${ctx.message.text})`);
 });
 
-bot.on('callback_query', (ctx) => {
-  ctx.telegram.answerCbQuery(ctx.callbackQuery.id);
+bot.on('callback_query', async (ctx) => {
+  try {
+    const data = (ctx.callbackQuery as any).data;
+
+    if (data === 'update_status') {
+      const tasksCollection = db.collection('tasks');
+
+      const task = await tasksCollection.findOne({ statusMessageId: ctx.callbackQuery.message?.message_id });
+
+      const { text, markup } = hasBeenSentTemplate(task);
+
+      await ctx.telegram.editMessageText(
+        ctx.callbackQuery.message?.chat.id,
+        ctx.callbackQuery.message?.message_id,
+        undefined,
+        text,
+        markup,
+      );
+    }
+  } catch (e) {
+    logger.info(e.message);
+  }
+  await ctx.telegram.answerCbQuery(ctx.callbackQuery.id);
 });
 
 bot.on('inline_query', (ctx) => {

@@ -4,6 +4,8 @@ import { logger } from '../logger';
 import { exportRootFolder, templateRootFolder } from '../init-root-folders';
 import { db } from '../mongo';
 import { bot } from '../bot';
+import { Markup } from 'telegraf';
+import { hasBeenSentTemplate } from '../text/has-been-sent-template';
 
 export async function startTask(task: Task) {
   const response = await axios.get<Buffer>(task.fileUrl.toString(), {
@@ -45,10 +47,12 @@ export async function startTask(task: Task) {
 
   const tasksCollection = db.collection('tasks');
 
+  const { text, markup } = hasBeenSentTemplate(task);
+
+  const res = await bot.telegram.sendMessage(task.chatId, text, markup);
+
   await tasksCollection.updateOne(
     { _id: task._id },
-    { $set: { exportId: exportData.id, state: TaskState.pendingExport } },
+    { $set: { exportId: exportData.id, state: TaskState.pendingExport, statusMessageId: res.message_id } },
   );
-
-  await bot.telegram.sendMessage(task.chatId, `Файл ${task.fileName} был добавлен в очередь для генерации отчета.`);
 }
