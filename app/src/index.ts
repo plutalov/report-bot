@@ -1,6 +1,5 @@
 import { Telegraf } from 'telegraf';
 import winston from 'winston';
-import { config } from 'dotenv';
 import axios from 'axios';
 
 const logger = winston.createLogger({
@@ -13,8 +12,6 @@ const logger = winston.createLogger({
     }),
   ],
 });
-
-config({ path: '.env' });
 
 if (process.env.BOT_TOKEN == null) throw new Error(`BOT_TOKEN environment variable must be set`);
 if (process.env.FASTREPORT_API_TOKEN == null) throw new Error(`FASTREPORT_API_TOKEN environment variable must be set`);
