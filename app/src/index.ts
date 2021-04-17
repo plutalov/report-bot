@@ -15,6 +15,54 @@ let db: Db;
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
+interface IData {
+  reportInfo: {
+    author: null | string;
+    created: string;
+    creatorVersion: string;
+    description: null | string;
+    modified: string;
+    name: null | string;
+    picture: null | string;
+    previewPictureRatio: number;
+    saveMode: string;
+    savePreviewPicture: boolean;
+    tag: null | string;
+    version: null | string;
+  };
+  name: string;
+  parentId: string;
+  tags: null | string;
+  icon: null | string;
+  type: string;
+  size: number;
+  subscriptionId: string;
+  status: string;
+  id: string;
+  createdTime: string;
+  creatorUserId: string;
+  editedTime: string;
+  editorUserId: string;
+}
+
+interface IExportData {
+  format: string;
+  reportId: string;
+  name: string;
+  parentId: string;
+  tags: null | string;
+  icon: null | string;
+  type: string;
+  size: number;
+  subscriptionId: string;
+  status: string;
+  id: string;
+  createdTime: string;
+  creatorUserId: string;
+  editedTime: string;
+  editorUserId: string;
+}
+
 async function init() {
   db = await connectToMongoDB();
 
@@ -47,7 +95,7 @@ async function init() {
 
 bot.command('help', (ctx) => {
   ctx.replyWithMarkdown(
-    '**No help here!**\nThere are spots even on the Sun.\n\nAuthors:\nIlya\nSanya\n\nhttps://fastreport.cloud/',
+    '**Report Bot**\n\nСписок доступных команд:\n```/start```\n```/help```\n```/status```\n\nАвторы:\nIlya\nSanya\n\nhttps://fastreport.cloud/',
   );
 });
 
@@ -148,7 +196,9 @@ bot.on('document', async (ctx) => {
     state: TaskState.pending,
   });
 
-  ctx.reply(`The file has been added to the queue. Use /status ${exportData.id} for checking`);
+  ctx.reply(
+    `Файл ${fileName} был добавлен в очередь для генерации отчета.\nИспользуйте команду /status ${exportData.id} для проверки статуса.`,
+  );
 });
 
 bot.command('status', async (ctx) => {

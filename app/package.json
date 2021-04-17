@@ -1,7 +1,7 @@
 {
-  "name": "the-bot",
+  "name": "report-bot",
   "version": "0.0.1",
-  "description": "The bot",
+  "description": "Report Bot",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
