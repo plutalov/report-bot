@@ -1,17 +1,8 @@
 import { Telegraf } from 'telegraf';
-import winston from 'winston';
 import axios from 'axios';
-
-const logger = winston.createLogger({
-  level: 'silly',
-  format: winston.format.json(),
-  defaultMeta: { service: 'the-bot' },
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(winston.format.timestamp(), winston.format.prettyPrint()),
-    }),
-  ],
-});
+import { logger } from './logger';
+import { Db } from 'mongodb';
+import { connectToMongoDB } from './mongo';
 
 if (process.env.BOT_TOKEN == null) throw new Error(`BOT_TOKEN environment variable must be set`);
 if (process.env.FASTREPORT_API_TOKEN == null) throw new Error(`FASTREPORT_API_TOKEN environment variable must be set`);
@@ -25,10 +16,21 @@ const api = axios.create({
 
 let templateRootFolder: string;
 let reportRootFolder: string;
+let db: Db;
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 async function init() {
+  db = await connectToMongoDB();
+
+  const testCollection = db.collection('test');
+
+  await testCollection.insertOne({ test: 1234 });
+
+  const response = await testCollection.find().toArray();
+
+  logger.silly(response);
+
   const [
     {
       data: { id: templateFolderId },

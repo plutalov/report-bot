@@ -2,7 +2,7 @@ version: "3"
 
 services:
   mongodb:
-    image: mongo
+    image: mongo:4.4
     container_name: mongodb
     environment:
       - PUID=1000
@@ -25,13 +25,15 @@ services:
     command: npm run dev
     container_name: bot
     volumes:
-      - "./app:${DOCKER_PATH}/app"
-      - "${DOCKER_PATH}/app/node_modules"
+      - "./app:/var/www/bot/app"
+      - "/var/www/bot/app/node_modules"
     depends_on:
       - mongodb
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
       FASTREPORT_API_TOKEN: ${FASTREPORT_API_TOKEN}
+      MONGO_URL: ${MONGO_URL}
+      MONGO_DB_NAME: ${MONGO_DB_NAME}
     restart: unless-stopped
     logging:
       driver: "json-file"
