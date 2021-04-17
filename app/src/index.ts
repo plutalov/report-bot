@@ -1,21 +1,16 @@
 import { Telegraf } from 'telegraf';
-import axios from 'axios';
-import { logger } from './logger';
 import { Db } from 'mongodb';
-import { connectToMongoDB } from './mongo';
+import { api, axios } from './services/axios';
+import { logger } from './services/logger';
+import { connectToMongoDB } from './services/mongo';
+import Bluebird from 'bluebird';
+import { Task, TaskState } from './models/task';
 
 if (process.env.BOT_TOKEN == null) throw new Error(`BOT_TOKEN environment variable must be set`);
-if (process.env.FASTREPORT_API_TOKEN == null) throw new Error(`FASTREPORT_API_TOKEN environment variable must be set`);
-
-const api = axios.create({
-  baseURL: 'https://fastreport.cloud',
-  headers: {
-    Authorization: `Basic ${Buffer.from(`apikey:${process.env.FASTREPORT_API_TOKEN}`).toString('base64')}`,
-  },
-});
 
 let templateRootFolder: string;
 let reportRootFolder: string;
+let exportRootFolder: string;
 let db: Db;
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -23,20 +18,15 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 async function init() {
   db = await connectToMongoDB();
 
-  const testCollection = db.collection('test');
-
-  await testCollection.insertOne({ test: 1234 });
-
-  const response = await testCollection.find().toArray();
-
-  logger.silly(response);
-
   const [
     {
       data: { id: templateFolderId },
     },
     {
       data: { id: reportFolderId },
+    },
+    {
+      data: { id: exportFolderId },
     },
   ] = await Promise.all([
     api.get('/api/rp/v1/Templates/Root'),
@@ -46,8 +36,13 @@ async function init() {
 
   templateRootFolder = templateFolderId;
   reportRootFolder = reportFolderId;
+  exportRootFolder = exportFolderId;
 
-  bot.launch().then(() => logger.info('The bot has been launched!'));
+  await bot.launch();
+
+  logger.info('The bot has been launched!');
+
+  setTimeout(resolvePendingExports, 5000);
 }
 
 bot.command('help', (ctx) => {
@@ -55,6 +50,33 @@ bot.command('help', (ctx) => {
     '**No help here!**\nThere are spots even on the Sun.\n\nAuthors:\nIlya\nSanya\n\nhttps://fastreport.cloud/',
   );
 });
+
+async function resolvePendingExports() {
+  try {
+    const tasksCollection = db.collection('tasks');
+
+    const tasks: Task[] = await tasksCollection
+      .find({
+        state: TaskState.pending,
+      })
+      .toArray();
+
+    await Bluebird.map(tasks, async (task) => {
+      const { data } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}/Export`);
+
+      if (data.state === 'Success') {
+        const { data: resultData } = await api.get(`/download/e/${task.exportId}`, { responseType: 'arraybuffer' });
+
+        await bot.telegram.sendDocument(task.chatId, {
+          source: resultData,
+          filename: data.name,
+        });
+      }
+    });
+  } finally {
+    setTimeout(resolvePendingExports, 5000);
+  }
+}
 
 bot.on('document', async (ctx) => {
   const file = ctx.update.message.document;
@@ -67,9 +89,9 @@ bot.on('document', async (ctx) => {
     return;
   }
 
-  const isExtensionSupported = /\.(frx|fpx)$/i.test(fileName);
+  const extensionResult = /\.(frx|fpx)$/i.test(fileName);
 
-  if (!isExtensionSupported) {
+  if (!extensionResult) {
     ctx.reply('The file has an unsupported extension');
 
     return;
@@ -95,13 +117,14 @@ bot.on('document', async (ctx) => {
     },
   );
 
-  logger.info(data);
+  logger.info(data, { action: 'upload file' });
 
-  const { data: reportData } = await api.post(
-    `/api/rp/v1/Templates/File/${data.id}/Prepare`,
+  const { data: exportData } = await api.post(
+    `/api/rp/v1/Templates/File/${data.id}/Export`,
     {
-      name: fileName,
-      parentFolderId: reportRootFolder,
+      fileName,
+      folderId: exportRootFolder,
+      format: 'Pdf',
     },
     {
       headers: {
@@ -111,9 +134,17 @@ bot.on('document', async (ctx) => {
     },
   );
 
-  logger.info(reportData);
+  logger.info(exportData, { action: 'export' });
 
-  ctx.reply(`The file has been added to the queue. Use /status ${reportData.id} for checking`);
+  const tasksCollection = db.collection('tasks');
+
+  await tasksCollection.insertOne({
+    chatId: ctx.chat.id,
+    exportId: exportData.id,
+    state: TaskState.pending,
+  });
+
+  ctx.reply(`The file has been added to the queue. Use /status ${exportData.id} for checking`);
 });
 
 bot.command('status', async (ctx) => {
