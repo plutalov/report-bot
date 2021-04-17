@@ -4,6 +4,7 @@ export enum TaskState {
 }
 
 export interface Task {
+  _id: string;
   chatId: number;
   exportId: number;
   state: TaskState;

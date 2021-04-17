@@ -53,6 +53,8 @@ bot.command('help', (ctx) => {
 
 async function resolvePendingExports() {
   try {
+    logger.silly('Resolving...');
+
     const tasksCollection = db.collection('tasks');
 
     const tasks: Task[] = await tasksCollection
@@ -62,15 +64,19 @@ async function resolvePendingExports() {
       .toArray();
 
     await Bluebird.map(tasks, async (task) => {
-      const { data } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}/Export`);
+      const { data } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}`);
 
-      if (data.state === 'Success') {
+      if (data.status === 'Success') {
         const { data: resultData } = await api.get(`/download/e/${task.exportId}`, { responseType: 'arraybuffer' });
 
         await bot.telegram.sendDocument(task.chatId, {
           source: resultData,
           filename: data.name,
         });
+
+        await tasksCollection.updateOne({ _id: task._id }, { $set: { state: TaskState.resolved } });
+
+        logger.info(`The task ${task._id} has been resolved`);
       }
     });
   } finally {
