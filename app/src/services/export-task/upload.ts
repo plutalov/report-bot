@@ -4,6 +4,10 @@ import { Task, TaskState } from '../../models/task';
 import { startTask } from './start-task';
 import { logger } from '../logger';
 import { errorTemplate } from '../templates/error-template';
+import { requestFormat } from './request-format';
+import { api, axios } from '../axios';
+import { getEntityNameByExtension } from '../get-entity-name-by-extension';
+import { templateRootFolder } from '../init-root-folders';
 
 export async function upload(ctx: Context) {
   try {
@@ -39,7 +43,40 @@ export async function upload(ctx: Context) {
 
     const task: Task = insertedResponse.ops[0];
 
-    await startTask(task, ctx);
+    try {
+      const response = await axios.get<Buffer>(task.fileUrl.toString(), {
+        responseType: 'arraybuffer',
+      });
+
+      const { data } = await api.post(
+        `/api/rp/v1/${getEntityNameByExtension(task.fileExtension)}/Folder/${templateRootFolder}/File`,
+        {
+          name: task.fileName,
+          content: response.data.toString('base64'),
+        },
+        {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json-patch+json',
+          },
+        },
+      );
+
+      logger.info(data, { action: 'upload file' });
+
+      await tasksCollection.updateOne(
+        { _id: task._id },
+        { $set: { state: TaskState.formatPending, uploadedFileId: data.id } },
+      );
+    } catch (e) {
+      logger.error(e);
+
+      await tasksCollection.updateOne({ _id: task._id }, { $set: { state: TaskState.failed } });
+    }
+
+    const resultTask: Task = await tasksCollection.findOne({ _id: task._id });
+
+    await requestFormat(resultTask);
   } catch (e) {
     logger.error(e, { ctx });
 

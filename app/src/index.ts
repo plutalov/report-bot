@@ -11,6 +11,7 @@ import { statusCommand } from './services/commands/status-command';
 import { upload } from './services/export-task/upload';
 import { handleTask } from './services/export-task/handle-task';
 import { updateStatusCallback } from './services/callbacks/update-status-callback';
+import { setFormatCallback } from './services/callbacks/set-format-callback';
 
 async function init() {
   await connectToMongoDB();
@@ -73,6 +74,8 @@ bot.on('callback_query', async (ctx) => {
 
     if (data === 'update_status') {
       await updateStatusCallback(ctx);
+    } else if (/^set_format_\w+$/.test(data)) {
+      await setFormatCallback(ctx);
     }
   } catch (e) {
     logger.info(e.message);

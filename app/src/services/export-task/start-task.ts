@@ -10,32 +10,12 @@ import { Context } from 'telegraf';
 
 export async function startTask(task: Task, ctx: Context) {
   try {
-    const response = await axios.get<Buffer>(task.fileUrl.toString(), {
-      responseType: 'arraybuffer',
-    });
-
-    const { data } = await api.post(
-      `/api/rp/v1/${getEntityNameByExtension(task.fileExtension)}/Folder/${templateRootFolder}/File`,
-      {
-        name: task.fileName,
-        content: response.data.toString('base64'),
-      },
-      {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json-patch+json',
-        },
-      },
-    );
-
-    logger.info(data, { action: 'upload file' });
-
     const { data: exportData } = await api.post(
-      `/api/rp/v1/${getEntityNameByExtension(task.fileExtension)}/File/${data.id}/Export`,
+      `/api/rp/v1/${getEntityNameByExtension(task.fileExtension)}/File/${task.uploadedFileId}/Export`,
       {
         fileName: task.fileName,
         folderId: exportRootFolder,
-        format: 'Pdf',
+        format: task.exportExtension ?? 'Pdf',
       },
       {
         headers: {
@@ -64,10 +44,10 @@ export async function startTask(task: Task, ctx: Context) {
 
     const resultTask = await tasksCollection.findOne({ _id: task._id });
 
+    logger.debug({ resultTask });
+
     const { text, markup } = hasBeenSentTemplate(resultTask);
 
-    const res = await bot.telegram.sendMessage(resultTask.chatId, text, markup);
-
-    await tasksCollection.updateOne({ _id: resultTask._id }, { $set: { statusMessageId: res.message_id } });
+    await ctx.telegram.editMessageText(resultTask.chatId, resultTask.statusMessageId, undefined, text, markup);
   }
 }
