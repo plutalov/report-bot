@@ -11,6 +11,7 @@ import { hasBeenSentTemplate } from './services/templates/has-been-sent-template
 import { taskStatusTemplate } from './services/templates/task-status-template';
 import { startCommand } from './services/commands/start-command';
 import { helpCommand } from './services/commands/help-command';
+import { statusCommand } from './services/commands/status-command';
 
 interface IData {
   reportInfo: {
@@ -138,23 +139,7 @@ bot.on('document', async (ctx) => {
 });
 
 bot.command('status', async (ctx) => {
-  const tasksCollection = db.collection('tasks');
-
-  const tasks = await tasksCollection
-    .find({ chatId: ctx.chat.id, $or: [{ state: TaskState.queued }, { state: TaskState.pendingExport }] })
-    .toArray();
-
-  if (tasks.length) {
-    const statuses = tasks.map((task) => {
-      const { text } = taskStatusTemplate(task);
-
-      return `Файл: ${task.fileName}\nТекущий статус: ${text}`;
-    });
-
-    ctx.reply(statuses.join('\n\n'));
-  } else {
-    ctx.reply('Все загруженные файлы были успешно экспортированы.');
-  }
+  await statusCommand(ctx);
 });
 
 bot.command('quit', (ctx) => {
