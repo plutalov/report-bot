@@ -4,7 +4,7 @@ import { logger } from '../logger';
 import { exportRootFolder, templateRootFolder } from '../init-root-folders';
 import { db } from '../mongo';
 import { bot } from '../bot';
-import { hasBeenSentTemplate } from '../text/has-been-sent-template';
+import { hasBeenSentTemplate } from '../templates/has-been-sent-template';
 import { getEntityNameByExtension } from '../get-entity-name-by-extension';
 
 export async function startTask(task: Task) {

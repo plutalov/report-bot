@@ -3,7 +3,7 @@ import { api } from '../axios';
 import { logger } from '../logger';
 import { bot } from '../bot';
 import { db } from '../mongo';
-import { hasBeenSentTemplate } from '../text/has-been-sent-template';
+import { hasBeenSentTemplate } from '../templates/has-been-sent-template';
 import mongo from 'mongodb';
 
 export async function handleTaskSuccess(task: Task, data: any) {

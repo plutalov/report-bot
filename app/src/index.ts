@@ -7,8 +7,10 @@ import { bot } from './services/bot';
 import { handleTaskSuccess } from './services/export-task/handle-task-success';
 import { startTask } from './services/export-task/start-task';
 import { initRootFolders } from './services/init-root-folders';
-import { hasBeenSentTemplate } from './services/text/has-been-sent-template';
-import { taskStatus } from './services/text/task-status';
+import { hasBeenSentTemplate } from './services/templates/has-been-sent-template';
+import { taskStatusTemplate } from './services/templates/task-status-template';
+import { startCommand } from './services/commands/start-command';
+import { helpCommand } from './services/commands/help-command';
 
 interface IData {
   reportInfo: {
@@ -70,16 +72,13 @@ async function init() {
   setTimeout(resolvePendingExports, 2500);
 }
 
-bot.command('start', (ctx) => {
-  ctx.replyWithMarkdown(
-    '**Бот для отчетов** приветствует Вас! Посмотреть список доступных команд можно с помощью /help',
-  );
+bot.command('start', async (ctx) => {
+  logger.silly('start');
+  await startCommand(ctx);
 });
 
-bot.command('help', (ctx) => {
-  ctx.replyWithMarkdown(
-    '**Report Bot**\n\nСписок доступных команд:\n```/start```\n```/help```\n```/status```\n\nАвторы:\nIlya\nSanya\n\nhttps://fastreport.cloud/',
-  );
+bot.command('help', async (ctx) => {
+  await helpCommand(ctx);
 });
 
 async function resolvePendingExports() {
@@ -147,7 +146,7 @@ bot.command('status', async (ctx) => {
 
   if (tasks.length) {
     const statuses = tasks.map((task) => {
-      const { text } = taskStatus(task);
+      const { text } = taskStatusTemplate(task);
 
       return `Файл: ${task.fileName}\nТекущий статус: ${text}`;
     });
@@ -162,11 +161,8 @@ bot.command('quit', (ctx) => {
   ctx.telegram.leaveChat(ctx.message.chat.id);
 });
 
-bot.on('text', (ctx) => {
-  ctx.telegram.sendMessage(
-    ctx.message.chat.id,
-    `Бот для отчетов приветствует Вас! Посмотреть список доступных команд можно с помощью /help`,
-  );
+bot.on('text', async (ctx) => {
+  await startCommand(ctx);
 });
 
 bot.on('callback_query', async (ctx) => {
@@ -191,6 +187,7 @@ bot.on('callback_query', async (ctx) => {
   } catch (e) {
     logger.info(e.message);
   }
+
   await ctx.telegram.answerCbQuery(ctx.callbackQuery.id);
 });
 
