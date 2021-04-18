@@ -1,65 +1,15 @@
-import { api } from './services/axios';
 import { logger } from './services/logger';
 import { connectToMongoDB, db } from './services/mongo';
 import Bluebird from 'bluebird';
 import { Task, TaskState } from './models/task';
 import { bot } from './services/bot';
-import { handleTaskSuccess } from './services/export-task/handle-task-success';
-import { startTask } from './services/export-task/start-task';
 import { initRootFolders } from './services/init-root-folders';
 import { hasBeenSentTemplate } from './services/templates/has-been-sent-template';
-import { taskStatusTemplate } from './services/templates/task-status-template';
 import { startCommand } from './services/commands/start-command';
 import { helpCommand } from './services/commands/help-command';
 import { statusCommand } from './services/commands/status-command';
-
-interface IData {
-  reportInfo: {
-    author: null | string;
-    created: string;
-    creatorVersion: string;
-    description: null | string;
-    modified: string;
-    name: null | string;
-    picture: null | string;
-    previewPictureRatio: number;
-    saveMode: string;
-    savePreviewPicture: boolean;
-    tag: null | string;
-    version: null | string;
-  };
-  name: string;
-  parentId: string;
-  tags: null | string;
-  icon: null | string;
-  type: string;
-  size: number;
-  subscriptionId: string;
-  status: string;
-  id: string;
-  createdTime: string;
-  creatorUserId: string;
-  editedTime: string;
-  editorUserId: string;
-}
-
-interface IExportData {
-  format: string;
-  reportId: string;
-  name: string;
-  parentId: string;
-  tags: null | string;
-  icon: null | string;
-  type: string;
-  size: number;
-  subscriptionId: string;
-  status: string;
-  id: string;
-  createdTime: string;
-  creatorUserId: string;
-  editedTime: string;
-  editorUserId: string;
-}
+import { upload } from './services/export-task/upload';
+import { handleTask } from './services/export-task/handle-task';
 
 async function init() {
   await connectToMongoDB();
@@ -93,11 +43,7 @@ async function resolvePendingExports() {
       .toArray();
 
     await Bluebird.map(tasks, async (task) => {
-      const { data }: { data: IExportData } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}`);
-
-      if (data.status === 'Success') {
-        await handleTaskSuccess(task, data);
-      }
+      await handleTask(task);
     });
   } finally {
     setTimeout(resolvePendingExports, 2500);
@@ -105,37 +51,7 @@ async function resolvePendingExports() {
 }
 
 bot.on('document', async (ctx) => {
-  const file = ctx.update.message.document;
-
-  const { file_id: fileId, file_name: fileName } = file;
-
-  if (fileName == null) {
-    ctx.reply('The file has no name');
-
-    return;
-  }
-
-  const extensionResult = /\.(frx|fpx)$/i.exec(fileName);
-
-  if (!extensionResult) {
-    ctx.reply('The file has an unsupported extension');
-
-    return;
-  }
-
-  const fileUrl = await ctx.telegram.getFileLink(fileId);
-
-  const tasksCollection = db.collection('tasks');
-
-  const task = await tasksCollection.insertOne({
-    chatId: ctx.chat.id,
-    state: TaskState.queued,
-    fileUrl: fileUrl.toString(),
-    fileName,
-    fileExtension: extensionResult[1],
-  });
-
-  await startTask(task.ops[0]);
+  await upload(ctx);
 });
 
 bot.command('status', async (ctx) => {
@@ -179,7 +95,11 @@ bot.on('callback_query', async (ctx) => {
 bot.on('inline_query', (ctx) => {
   const result: any[] = [];
 
-  ctx.telegram.answerInlineQuery(ctx.inlineQuery.id, result);
+  try {
+    ctx.telegram.answerInlineQuery(ctx.inlineQuery.id, result);
+  } catch (e) {
+    logger.error(e, { ctx });
+  }
 });
 
 // Enable graceful stop

@@ -2,6 +2,7 @@ export enum TaskState {
   queued,
   pendingExport,
   resolved,
+  failed,
 }
 
 export interface Task {
