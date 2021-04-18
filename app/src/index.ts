@@ -8,7 +8,7 @@ import { handleTaskSuccess } from './services/export-task/handle-task-success';
 import { startTask } from './services/export-task/start-task';
 import { initRootFolders } from './services/init-root-folders';
 import { hasBeenSentTemplate } from './services/text/has-been-sent-template';
-import mongo from 'mongodb';
+import { taskStatus } from './services/text/task-status';
 
 interface IData {
   reportInfo: {
@@ -87,7 +87,7 @@ async function resolvePendingExports() {
       .toArray();
 
     await Bluebird.map(tasks, async (task) => {
-      const { data } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}`);
+      const { data }: { data: IExportData } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}`);
 
       if (data.status === 'Success') {
         await handleTaskSuccess(task, data);
@@ -109,7 +109,7 @@ bot.on('document', async (ctx) => {
     return;
   }
 
-  const extensionResult = /\.(frx|fpx)$/i.test(fileName);
+  const extensionResult = /\.(frx|fpx)$/i.exec(fileName);
 
   if (!extensionResult) {
     ctx.reply('The file has an unsupported extension');
@@ -126,41 +126,30 @@ bot.on('document', async (ctx) => {
     state: TaskState.queued,
     fileUrl: fileUrl.toString(),
     fileName,
+    fileExtension: extensionResult[1],
   });
 
   await startTask(task.ops[0]);
 });
 
 bot.command('status', async (ctx) => {
-  const parseResult = /^\/status (.+)$/.exec(ctx.message.text);
+  const tasksCollection = db.collection('tasks');
 
-  if (!parseResult) {
-    ctx.reply('Use the following syntax: /status id');
+  const tasks = await tasksCollection
+    .find({ $or: [{ state: TaskState.queued }, { state: TaskState.pendingExport }] })
+    .toArray();
 
-    return;
+  if (tasks.length) {
+    const statuses = tasks.map((task) => {
+      const { text } = taskStatus(task);
+
+      return `Файл: ${task.fileName}\nТекущий статус: ${text}`;
+    });
+
+    ctx.reply(statuses.join('\n\n'));
+  } else {
+    ctx.reply('Все загруженные файлы были успешно экспортированы.');
   }
-
-  const [, id] = parseResult;
-
-  const { data } = await api.get(`/api/rp/v1/Reports/File/${id}`);
-
-  ctx.reply(data.status);
-});
-
-bot.command('download', async (ctx) => {
-  const parseResult = /^\/download (.+)$/.exec(ctx.message.text);
-
-  if (!parseResult) {
-    ctx.reply('Use the following syntax: /status id');
-
-    return;
-  }
-
-  const [, id] = parseResult;
-
-  const { data } = await api.get<Buffer>(`/download/r/${id}`, { responseType: 'arraybuffer' });
-
-  await ctx.replyWithDocument({ source: data, filename: id + '.frx' });
 });
 
 bot.command('quit', (ctx) => {

@@ -4,8 +4,8 @@ import { logger } from '../logger';
 import { exportRootFolder, templateRootFolder } from '../init-root-folders';
 import { db } from '../mongo';
 import { bot } from '../bot';
-import { Markup } from 'telegraf';
 import { hasBeenSentTemplate } from '../text/has-been-sent-template';
+import { getEntityNameByExtension } from '../get-entity-name-by-extension';
 
 export async function startTask(task: Task) {
   const response = await axios.get<Buffer>(task.fileUrl.toString(), {
@@ -13,7 +13,7 @@ export async function startTask(task: Task) {
   });
 
   const { data } = await api.post(
-    `/api/rp/v1/Templates/Folder/${templateRootFolder}/File`,
+    `/api/rp/v1/${getEntityNameByExtension(task.fileExtension)}/Folder/${templateRootFolder}/File`,
     {
       name: task.fileName,
       content: response.data.toString('base64'),
@@ -29,7 +29,7 @@ export async function startTask(task: Task) {
   logger.info(data, { action: 'upload file' });
 
   const { data: exportData } = await api.post(
-    `/api/rp/v1/Templates/File/${data.id}/Export`,
+    `/api/rp/v1/${getEntityNameByExtension(task.fileExtension)}/File/${data.id}/Export`,
     {
       fileName: task.fileName,
       folderId: exportRootFolder,
