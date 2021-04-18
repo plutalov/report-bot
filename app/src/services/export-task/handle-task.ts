@@ -8,22 +8,35 @@ import mongo from 'mongodb';
 import { IExportData } from '../../models/api';
 
 export async function handleTask(task: Task) {
-  const { data }: { data: IExportData } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}`);
+  try {
+    const { data }: { data: IExportData } = await api.get(`/api/rp/v1/Exports/File/${task.exportId}`);
 
-  if (data.status === 'Success') {
-    const { data: resultData } = await api.get(`/download/e/${task.exportId}`, { responseType: 'stream' });
+    if (data.status === 'Success') {
+      const { data: resultData } = await api.get(`/download/e/${task.exportId}`, { responseType: 'stream' });
 
-    await bot.telegram.sendDocument(task.chatId, {
-      source: resultData,
-      filename: data.name,
-    });
+      await bot.telegram.sendDocument(task.chatId, {
+        source: resultData,
+        filename: data.name,
+      });
 
+      const tasksCollection = db.collection('tasks');
+
+      await tasksCollection.updateOne({ _id: task._id }, { $set: { state: TaskState.resolved } });
+
+      logger.info(`The task ${task._id} has been resolved`);
+    }
+  } catch (e) {
     const tasksCollection = db.collection('tasks');
 
-    await tasksCollection.updateOne({ _id: task._id }, { $set: { state: TaskState.resolved } });
+    await tasksCollection.updateOne({ _id: task._id }, { $set: { state: TaskState.failed } });
 
+    logger.info(`The task ${task._id} HASN'T been resolved`);
+  } finally {
     try {
+      const tasksCollection = db.collection('tasks');
+
       const updatedTask: Task = await tasksCollection.findOne({ _id: new mongo.ObjectId(task._id) });
+
       const { text, markup } = hasBeenSentTemplate(updatedTask);
 
       await bot.telegram.editMessageText(
@@ -36,7 +49,5 @@ export async function handleTask(task: Task) {
     } catch (e) {
       logger.error(e);
     }
-
-    logger.info(`The task ${task._id} has been resolved`);
   }
 }
