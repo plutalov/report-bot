@@ -70,6 +70,12 @@ async function init() {
   setTimeout(resolvePendingExports, 2500);
 }
 
+bot.command('start', (ctx) => {
+  ctx.replyWithMarkdown(
+    '**Бот для отчетов** приветствует Вас! Посмотреть список доступных команд можно с помощью /help',
+  );
+});
+
 bot.command('help', (ctx) => {
   ctx.replyWithMarkdown(
     '**Report Bot**\n\nСписок доступных команд:\n```/start```\n```/help```\n```/status```\n\nАвторы:\nIlya\nSanya\n\nhttps://fastreport.cloud/',
@@ -157,7 +163,10 @@ bot.command('quit', (ctx) => {
 });
 
 bot.on('text', (ctx) => {
-  ctx.telegram.sendMessage(ctx.message.chat.id, `Hello ${ctx.state.role} (${ctx.message.text})`);
+  ctx.telegram.sendMessage(
+    ctx.message.chat.id,
+    `Бот для отчетов приветствует Вас! Посмотреть список доступных команд можно с помощью /help`,
+  );
 });
 
 bot.on('callback_query', async (ctx) => {
