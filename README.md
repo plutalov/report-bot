@@ -42,5 +42,5 @@ docker-compose up -d
 
 РАЗРАБОТЧИКИ
 
-<h4>Александр Плуталов CORE https://t.me/test@name1</h4>
-<h4>Илья Болотов DOCS https://t.me/test@name1</h4>
+<h4>Александр Плуталов CORE</h4>
+<h4>Илья Болотов DOCS</h4>
