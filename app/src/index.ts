@@ -142,7 +142,7 @@ bot.command('status', async (ctx) => {
   const tasksCollection = db.collection('tasks');
 
   const tasks = await tasksCollection
-    .find({ $or: [{ state: TaskState.queued }, { state: TaskState.pendingExport }] })
+    .find({ chatId: ctx.chat.id, $or: [{ state: TaskState.queued }, { state: TaskState.pendingExport }] })
     .toArray();
 
   if (tasks.length) {
