@@ -1,7 +1,6 @@
 import { Context } from 'telegraf';
 import { db } from '../mongo';
 import { Task, TaskState } from '../../models/task';
-import { startTask } from './start-task';
 import { logger } from '../logger';
 import { errorTemplate } from '../templates/error-template';
 import { requestFormat } from './request-format';

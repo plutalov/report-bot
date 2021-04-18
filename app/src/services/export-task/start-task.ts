@@ -1,9 +1,8 @@
 import { Task, TaskState } from '../../models/task';
-import { api, axios } from '../axios';
+import { api } from '../axios';
 import { logger } from '../logger';
-import { exportRootFolder, templateRootFolder } from '../init-root-folders';
+import { exportRootFolder } from '../init-root-folders';
 import { db } from '../mongo';
-import { bot } from '../bot';
 import { hasBeenSentTemplate } from '../templates/has-been-sent-template';
 import { getEntityNameByExtension } from '../get-entity-name-by-extension';
 import { Context } from 'telegraf';

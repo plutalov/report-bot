@@ -1,8 +1,7 @@
-import { Task, TaskState } from '../../models/task';
+import { TaskState } from '../../models/task';
 import { Context } from 'telegraf';
 import { db } from '../mongo';
 import { startTask } from '../export-task/start-task';
-import { logger } from '../logger';
 
 export async function setFormatCallback(ctx: Context) {
   const data = (ctx.callbackQuery as any).data;
