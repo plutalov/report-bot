@@ -10,6 +10,7 @@ import { helpCommand } from './services/commands/help-command';
 import { statusCommand } from './services/commands/status-command';
 import { upload } from './services/export-task/upload';
 import { handleTask } from './services/export-task/handle-task';
+import { updateStatusCallback } from './services/callbacks/update-status-callback';
 
 async function init() {
   await connectToMongoDB();
@@ -71,19 +72,7 @@ bot.on('callback_query', async (ctx) => {
     const data = (ctx.callbackQuery as any).data;
 
     if (data === 'update_status') {
-      const tasksCollection = db.collection('tasks');
-
-      const task = await tasksCollection.findOne({ statusMessageId: ctx.callbackQuery.message?.message_id });
-
-      const { text, markup } = hasBeenSentTemplate(task);
-
-      await ctx.telegram.editMessageText(
-        ctx.callbackQuery.message?.chat.id,
-        ctx.callbackQuery.message?.message_id,
-        undefined,
-        text,
-        markup,
-      );
+      await updateStatusCallback(ctx);
     }
   } catch (e) {
     logger.info(e.message);
