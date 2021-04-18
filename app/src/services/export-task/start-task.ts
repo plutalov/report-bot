@@ -16,12 +16,6 @@ export async function startTask(task: Task, ctx: Context) {
         folderId: exportRootFolder,
         format: task.exportExtension ?? 'Pdf',
       },
-      {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json-patch+json',
-        },
-      },
     );
 
     logger.info(exportData, { action: 'export' });
@@ -33,7 +27,7 @@ export async function startTask(task: Task, ctx: Context) {
       { $set: { exportId: exportData.id, state: TaskState.pendingExport } },
     );
   } catch (e) {
-    logger.error(e, { ctx });
+    logger.error(e);
 
     const tasksCollection = db.collection('tasks');
 
