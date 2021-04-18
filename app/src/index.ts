@@ -78,7 +78,11 @@ bot.on('callback_query', async (ctx) => {
     logger.info(e.message);
   }
 
-  await ctx.telegram.answerCbQuery(ctx.callbackQuery.id);
+  try {
+    await ctx.telegram.answerCbQuery(ctx.callbackQuery.id);
+  } catch (e) {
+    logger.error(e, { ctx });
+  }
 });
 
 bot.on('inline_query', (ctx) => {
